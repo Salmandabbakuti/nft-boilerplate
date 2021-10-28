@@ -6,13 +6,20 @@ bin-release/
 
 # Other files and folders
 .settings/
+node_modules/
+artifacts/
+cache/
+package-lock.json
 
 # Executables
 *.swf
 *.air
 *.ipa
 *.apk
+*.env
 
 # Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
 # should NOT be excluded as they contain compiler settings and other important
 # information for Eclipse / Flash Builder.
+.soliumignore
+.soliumrc.json
