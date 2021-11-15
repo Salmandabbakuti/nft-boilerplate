@@ -24,6 +24,17 @@
   color: white;
 }
 
+form {
+   background: white;
+   border: 1px solid #dedede;
+   display: flex;
+   flex-direction: column;
+   justify-content: space-around;
+   margin: 0 auto;
+   max-width: 500px;
+   padding: 60px 90px;
+ }
+
 .App-link {
   color: #61dafb;
 }
