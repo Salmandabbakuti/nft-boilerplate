@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Button, TextField } from '@material-ui/core';
 import axios from 'axios';
 import ipfsClient from "ipfs-http-client";
 import { ethers } from 'ethers';
@@ -26,12 +27,13 @@ function App() {
   };
 
   const createMarketItem = async (e) => {
-    const { name, description, image } = formInput;
     e.preventDefault();
     if (!['name', 'description', 'image', 'price'].every(key => formInput[key])) {
       alert("Please fill out all fields");
       return;
     };
+    const { name, description, image, price } = formInput;
+    const priceInWei = ethers.utils.parseEther(price);
     const { path } = await ipfs.add(
       JSON.stringify({
         name,
@@ -43,8 +45,11 @@ function App() {
     setLogMessage('Metadata uploaded to ipfs..');
     const tokenURL = `https://ipfs.io/ipfs/${path}`;
     const { dMarketContract } = await getContract();
-    const createItemTx = await dMarketContract.createNFT(tokenURL, formInput.price, { value: ethers.utils.parseEther('0.01') });
-    createItemTx.wait().then(() => setLogMessage('Item created successfully'));
+    const createItemTx = await dMarketContract.createNFT(tokenURL, priceInWei, { value: ethers.utils.parseEther('0.01') });
+    createItemTx.wait().then(() => {
+      setLogMessage('Item created successfully');
+      window.location.reload();
+    });
   };
 
   const getNfts = async () => {
@@ -78,27 +83,30 @@ function App() {
       <header className="App-header">
         <img src={ethLogo} className="App-logo" alt="logo" />
         <h1 className="App-title">dMarket NFT</h1>
-      < div className="new-market-item" >
         <form onSubmit={(e) => createMarketItem(e)}>
-          <input type="text" name="name" placeholder="Asset Name" onChange={(e) => setFormInput({ ...formInput, name: e.target.value })} />
-          <textarea name="description" placeholder="Description" onChange={(e) => setFormInput({ ...formInput, description: e.target.value })} />
-          <input type='number' name="price" placeholder="Price" onChange={(e) => setFormInput({ ...formInput, price: e.target.value })} />
-          <input type="file" name="image" placeholder="Image" onChange={(e) => uploadImageToIPFS(e)} />
-          <button type="submit">Create Item</button>
+          <h4 style={{ color: 'black', textAlign: 'center' }}>Create Market Item</h4>
+          <TextField type="text" name="name" placeholder="Asset Name" onChange={(e) => setFormInput({ ...formInput, name: e.target.value })} />
+          <TextField name="description" placeholder="Description" onChange={(e) => setFormInput({ ...formInput, description: e.target.value })} />
+          <TextField type='number' name="price" placeholder="Price in Ether" onChange={(e) => setFormInput({ ...formInput, price: e.target.value })} />
+          <TextField type="file" name="image" placeholder="Image" onChange={(e) => uploadImageToIPFS(e)} />
+          <Button variant="contained" type="submit">Create Item</Button>
         </form>
-      </div >
-      {nfts.map((item, i) => (
-        <div key={i}>
-          <p>ItemId: {item.tokenId.toString()}</p>
-          <p>Name: {item.meta.name}</p>
-          <img src={item.meta.image} alt={item.meta.name} />
-          <p>Description: {item.meta.description}</p>
-          <p>Price: {item.price} ETH</p>
-          <p>Owner: {item.owner}</p>
-          <p>Status: {item.isForSale ? 'For Sale' : 'Not For Sale'}</p>
-          {item.isForSale ? <button onClick={() => buyNft(item)}>Buy</button> : ''}
+        <div className="market-items">
+          {nfts.length ? nfts.map((item, i) => (
+            <div key={i}>
+              <p>ItemId: {item.tokenId.toString()}</p>
+              <p>Name: {item.meta.name}</p>
+              <img src={item.meta.image} alt={item.meta.name} />
+              <p>Description: {item.meta.description}</p>
+              <p>Price: {item.price} ETH</p>
+              <p>Owner: {item.owner}</p>
+              <p>Status: {item.isForSale ? 'For Sale' : 'Not For Sale'}</p>
+              {item.isForSale ? <button onClick={() => buyNft(item)}>Buy</button> : ''}
+            </div>
+          )) :
+            <p>No items in the Market.!</p>
+          }
         </div>
-      ))}
       </header>
       <p className="App-title">{logMessage}</p>
     </div >

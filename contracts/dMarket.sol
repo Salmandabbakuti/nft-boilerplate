@@ -61,8 +61,9 @@ contract dMarket is ERC721URIStorage {
             "You can not buy your own NFT.!"
         );
         _transfer(nfts[_tokenId].owner, msg.sender, _tokenId);
-        nfts[_tokenId].isForSale = false;
         nfts[_tokenId].owner.transfer(msg.value);
+        nfts[_tokenId].owner = payable(msg.sender);
+        nfts[_tokenId].isForSale = false;
         emit BuyNFT(msg.sender, _tokenId, nfts[_tokenId].price);
     }
 
