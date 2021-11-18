@@ -7,7 +7,6 @@ bin-release/
 # Other files and folders
 .settings/
 node_modules/
-artifacts/
 cache/
 package-lock.json
 
