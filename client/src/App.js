@@ -2,20 +2,55 @@ import { useState, useEffect } from 'react';
 import { Button, TextField } from '@material-ui/core';
 import axios from 'axios';
 import ipfsClient from "ipfs-http-client";
-import { ethers } from 'ethers';
-import ethLogo from './ethLogo.svg'
+import { ethers, Contract } from 'ethers';
+import Web3Modal from "web3modal";
+import ethLogo from './ethLogo.svg';
 import './App.css';
-import getContract from './blockchain';
+import { abi } from './artifacts/contracts/dMarket.sol/dMarket.json';
 
 const ipfs = new ipfsClient({ host: 'ipfs.infura.io', port: 5001, protocol: 'https' });
 
 function App() {
+  const [contract, setContract] = useState(null);
   const [nfts, setNfts] = useState([]);
   const [formInput, setFormInput] = useState({});
   const [logMessage, setLogMessage] = useState('');
 
+  const initWeb3 = async () => {
+    return new Promise(async (resolve, reject) => {
+      const web3Modal = new Web3Modal({
+        network: "ropsten",
+        cacheProvider: true,
+      });
+      const connection = await web3Modal.connect();
+      const provider = new ethers.providers.Web3Provider(connection);
+      const { chainId } = await provider.getNetwork();
+      console.log('chainId:', chainId);
+      if (chainId !== 80001) reject('Wrong network. Please switch to Polygon Mumbai Test network');
+      const signer = provider.getSigner();
+      const contract = new Contract('0x2a0c0073Ee8D651234E1be7Cd7Fb408f9B696cBA', abi, signer);
+      resolve({ contract });
+    });
+  }
+
   useEffect(() => {
-    getNfts();
+    initWeb3().then(async ({ contract }) => {
+      setContract(contract);
+      const marketItemCount = await contract.getNFTCount();
+      const items = [];
+      for (let i = 1; i <= parseInt(marketItemCount.toString()); i++) {
+        const item = await contract.nfts(i);
+        const tokenURI = await contract.tokenURI(i);
+        const meta = await axios.get(tokenURI);
+        const price = ethers.utils.formatEther(item.price.toString())
+        items.push({ ...item, price, meta: meta.data });
+      }
+      setNfts(items);
+      console.log('Market items: ', nfts);
+    }).catch(err => {
+      console.log('err:', err);
+      setLogMessage(err);
+    });
   }, []);
 
   const uploadImageToIPFS = async (e) => {
@@ -44,8 +79,7 @@ function App() {
     );
     setLogMessage('Metadata uploaded to ipfs..');
     const tokenURL = `https://ipfs.io/ipfs/${path}`;
-    const { dMarketContract } = await getContract();
-    const createItemTx = await dMarketContract.createNFT(tokenURL, priceInWei, { value: ethers.utils.parseEther('0.01') });
+    const createItemTx = await contract.createNFT(tokenURL, priceInWei, { value: ethers.utils.parseEther('0.01') });
     createItemTx.wait().then(() => {
       setLogMessage('Item created successfully');
       window.location.reload();
@@ -53,12 +87,11 @@ function App() {
   };
 
   const getNfts = async () => {
-    const { dMarketContract } = await getContract();
-    const marketItemCount = await dMarketContract.getNFTCount();
+    const marketItemCount = await contract.getNFTCount();
     const items = [];
     for (let i = 1; i <= parseInt(marketItemCount.toString()); i++) {
-      const item = await dMarketContract.nfts(i);
-      const tokenURI = await dMarketContract.tokenURI(i);
+      const item = await contract.nfts(i);
+      const tokenURI = await contract.tokenURI(i);
       const meta = await axios.get(tokenURI);
       const price = ethers.utils.formatEther(item.price.toString())
       items.push({ ...item, price, meta: meta.data });
@@ -66,17 +99,18 @@ function App() {
     setNfts(items);
     console.log('Market items: ', nfts);
   };
+
   const buyNft = async (marketItem) => {
-    const { dMarketContract } = await getContract();
     const { price, tokenId } = marketItem;
     console.log(price, tokenId)
-    const tx = await dMarketContract.buyNFT(tokenId.toString(), {
+    const tx = await contract.buyNFT(tokenId.toString(), {
       value: ethers.utils.parseEther(price.toString())
     });
     tx.wait().then(() => {
       setLogMessage(`Bought item ${marketItem.tokenId} for ${price} ETH`);
     });
   };
+
 
   return (
     <div className="App">
