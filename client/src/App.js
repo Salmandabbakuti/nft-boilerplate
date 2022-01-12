@@ -16,40 +16,73 @@ function App() {
   const [formInput, setFormInput] = useState({});
   const [logMessage, setLogMessage] = useState('');
 
-  const initWeb3 = async () => {
-    return new Promise(async (resolve, reject) => {
-      const web3Modal = new Web3Modal({
-        network: "ropsten",
-        cacheProvider: true,
-      });
-      const connection = await web3Modal.connect();
-      const provider = new ethers.providers.Web3Provider(connection);
-      const { chainId } = await provider.getNetwork();
-      console.log('chainId:', chainId);
-      if (chainId !== 80001) reject('Wrong network. Please switch to Polygon Mumbai Test network');
-      const signer = provider.getSigner();
-      const contract = new Contract('0x2a0c0073Ee8D651234E1be7Cd7Fb408f9B696cBA', abi, signer);
-      resolve({ contract });
-    });
-  }
-
   useEffect(() => {
-    initWeb3().then(async ({ contract }) => {
-      setContract(contract);
-      const marketItemCount = await contract.getNFTCount();
-      const items = [];
-      for (let i = 1; i <= parseInt(marketItemCount.toString()); i++) {
-        const item = await contract.nfts(i);
-        const tokenURI = await contract.tokenURI(i);
-        const meta = await axios.get(tokenURI);
-        const price = ethers.utils.formatEther(item.price.toString())
-        items.push({ ...item, price, meta: meta.data });
+    if (window.ethereum) {
+      window.ethereum.request({ method: 'eth_requestAccounts' }).catch((err) => console.error(err));
+      window.ethereum.on('accountsChanged', (accounts) => {
+        if (accounts.length > 0) {
+          console.log(`Using account ${accounts[0]}`);
+        } else {
+          console.error('No accounts found');
+        }
+      });
+      // listen for messages from metamask
+      window.ethereum.on('message', (message) => console.log(message));
+      // listen for chain changes
+      window.ethereum.on('chainChanged', (chainId) => {
+        console.log(`Chain changed to ${chainId}`);
+        window.location.reload();
+      });
+      // Subscribe to provider connection
+      window.ethereum.on("connect", (info) => {
+        console.log('Connected to network:', info);
+      });
+      // Subscribe to provider disconnection
+      window.ethereum.on("disconnect", (error) => {
+        console.log('disconnected from network: ', error);
+      });
+    } else {
+      console.error('No ethereum browser detected');
+    }
+  }, []);
+  useEffect(() => {
+    const init = async () => {
+      if (window.ethereum) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const { chainId } = await provider.getNetwork();
+        console.log('chainId:', chainId);
+        const signer = provider.getSigner();
+        if (chainId !== 80001) {
+          console.error('Wrong network. Please switch to Polygon Mumbai Test network');
+          // Switch to Polygon Mumbai Test network
+          // if network is not ropsten, try switching to ropsten
+          window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x13881' }],
+          }).catch((err) => {
+            console.error(err.message);
+            setLogMessage(err.message);
+          });
+          return
+        }
+        const contract = new Contract('0x2a0c0073Ee8D651234E1be7Cd7Fb408f9B696cBA', abi, signer);
+        setContract(contract);
+        const marketItemCount = await contract.getNFTCount();
+        const items = [];
+        for (let i = 1; i <= parseInt(marketItemCount.toString()); i++) {
+          const item = await contract.nfts(i);
+          const tokenURI = await contract.tokenURI(i);
+          const meta = await axios.get(tokenURI);
+          const price = ethers.utils.formatEther(item.price.toString())
+          items.push({ ...item, price, meta: meta.data });
+        }
+        setNfts(items);
+        console.log('Market items: ', nfts);
       }
-      setNfts(items);
-      console.log('Market items: ', nfts);
-    }).catch(err => {
-      console.log('err:', err);
-      setLogMessage(err);
+    }
+    init().catch((err) => {
+      console.error(err)
+      setLogMessage(err.message);
     });
   }, []);
 
@@ -115,7 +148,6 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <img src={ethLogo} className="App-logo" alt="logo" />
         <h1 className="App-title">dMarket NFT</h1>
         <form onSubmit={(e) => createMarketItem(e)}>
           <h4 style={{ color: 'black', textAlign: 'center' }}>Create Market Item</h4>
