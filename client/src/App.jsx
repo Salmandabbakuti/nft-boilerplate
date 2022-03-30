@@ -5,8 +5,10 @@ import ipfsClient from "ipfs-http-client";
 import { ethers, Contract } from 'ethers';
 import Web3Modal from "web3modal";
 import ethLogo from './ethLogo.svg';
-import './App.css';
+// import './App.css';
 import { abi } from './artifacts/contracts/dMarket.sol/dMarket.json';
+import NFTCard from './NFTCard';
+import "./Marketplace.scss";
 
 const ipfs = new ipfsClient({ host: 'ipfs.infura.io', port: 5001, protocol: 'https' });
 
@@ -122,7 +124,7 @@ function App() {
   const getNfts = async () => {
     const marketItemCount = await contract.getNFTCount();
     const items = [];
-    for (let i = 1; i <= parseInt(marketItemCount.toString()); i++) {
+    for (let i = 1; i <= marketItemCount.toNumber(); i++) {
       const item = await contract.nfts(i);
       const tokenURI = await contract.tokenURI(i);
       const meta = await axios.get(tokenURI);
@@ -133,7 +135,7 @@ function App() {
     console.log('Market items: ', nfts);
   };
 
-  const buyNft = async (marketItem) => {
+  const handleBuyNft = async (marketItem) => {
     const { price, tokenId } = marketItem;
     console.log(price, tokenId)
     const tx = await contract.buyNFT(tokenId.toString(), {
@@ -148,7 +150,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1 className="App-title">dMarket NFT</h1>
+        <h1 className="App-title" style={{ textAlign: "center" }}>dMarket NFT</h1>
         <form onSubmit={(e) => createMarketItem(e)}>
           <h4 style={{ color: 'black', textAlign: 'center' }}>Create Market Item</h4>
           <TextField type="text" name="name" placeholder="Asset Name" onChange={(e) => setFormInput({ ...formInput, name: e.target.value })} />
@@ -157,21 +159,23 @@ function App() {
           <TextField type="file" name="image" placeholder="Image" onChange={(e) => uploadImageToIPFS(e)} />
           <Button variant="contained" type="submit">Create Item</Button>
         </form>
-        <div className="market-items">
-          {nfts.length ? nfts.map((item, i) => (
-            <div key={i}>
-              <p>ItemId: {item.tokenId.toString()}</p>
-              <p>Name: {item.meta.name}</p>
-              <img src={item.meta.image} alt={item.meta.name} />
-              <p>Description: {item.meta.description}</p>
-              <p>Price: {item.price} ETH</p>
-              <p>Owner: {item.owner}</p>
-              <p>Status: {item.isForSale ? 'For Sale' : 'Not For Sale'}</p>
-              {item.isForSale ? <button onClick={() => buyNft(item)}>Buy</button> : ''}
-            </div>
-          )) :
-            <p>No items in the Market.!</p>
-          }
+        <div className="wrapper">
+          {nfts.length ? nfts.map((nft) => {
+            console.log(nft);
+            return (
+              <NFTCard
+                tokenId={nft.tokenId}
+                key={nft.id}
+                image={nft.meta.image}
+                name={nft.meta.name}
+                description={nft.meta.description}
+                price={nft.price}
+                owner={nft.owner}
+                isForSale={nft.isForSale}
+                handleBuyNFT={() => handleBuyNft(nft)}
+              />
+            );
+          }) : <div>No items in the Market.!</div>}
         </div>
       </header>
       <p className="App-title">{logMessage}</p>
